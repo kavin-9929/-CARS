@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>VR Cyber Command - Final Auto-Shutdown</title>
+    <title>VR Cyber Command - Audio Edition</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style> @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap'); </style>
 </head>
@@ -86,7 +86,6 @@
                         timerEl.setAttribute('value', `TIME REMAINING: 0${m}:${s < 10 ? '0'+s : s}`); 
                         if(timeLeft < 60) timerEl.setAttribute('color', 'red'); 
                     } else { 
-                        // TIME IS UP - TRIGGER SHUTDOWN
                         clearInterval(timerInterval);
                         this.shutdownSequence();
                     } 
@@ -117,6 +116,10 @@
                 output.setAttribute('value', "EXECUTING COMMAND..."); 
                 
                 if (isCorrect) { 
+                    // PLAY SUCCESS SOUND
+                    const sound = document.querySelector('#sound-success');
+                    if(sound.components.sound) sound.components.sound.playSound();
+
                     output.setAttribute('color', '#00ff00'); 
                     output.setAttribute('value', "ACCESS GRANTED. PATCHING..."); 
                     setTimeout(() => { 
@@ -127,6 +130,10 @@
                         }
                     }, 2000); 
                 } else { 
+                    // PLAY K.O. SOUND
+                    const sound = document.querySelector('#sound-ko');
+                    if(sound.components.sound) sound.components.sound.playSound();
+
                     this.triggerGlitch(); 
                 } 
             },
@@ -148,25 +155,18 @@
                 }, 3000); 
             },
 
-            // --- AUTO CLOSE SEQUENCE ---
             shutdownSequence: function() {
-                // 1. Play shutdown sound (if you add audio later)
-                // 2. Fade everything to black
                 const blackOverlay = document.querySelector('#black-overlay');
                 blackOverlay.setAttribute('visible', 'true');
                 blackOverlay.setAttribute('animation', 'property: material.opacity; from: 0; to: 1; dur: 2000');
-                
-                // 3. Show "Connection Lost" Message
                 setTimeout(() => {
                     const endMsg = document.querySelector('#end-message');
                     endMsg.setAttribute('visible', 'true');
                     endMsg.setAttribute('value', "CONNECTION TERMINATED\n\nSESSION TIMED OUT");
                 }, 2000);
-
-                // 4. Try to close window (Note: Browsers may block this)
                 setTimeout(() => {
-                    window.close(); // Attempt to close tab
-                    // Fallback if browser blocks close:
+                    // Try close or fallback
+                    try { window.close(); } catch(e){}
                     document.querySelector('#end-message').setAttribute('value', "SIMULATION ENDED.\nPLEASE REMOVE HEADSET.");
                 }, 5000);
             },
@@ -206,7 +206,10 @@
             <a-mixin id="op-torso" geometry="primitive: cylinder; height: 0.7; radius: 0.25" material="color: #0a0a0a; roughness: 1"></a-mixin>
             <a-mixin id="op-head" geometry="primitive: sphere; radius: 0.18" material="color: #0a0a0a"></a-mixin>
             <a-mixin id="white-mask" geometry="primitive: sphere; radius: 0.17" scale="1 1.1 0.3" material="color: #eeeeee; roughness: 0.5; metalness: 0.1"></a-mixin>
-        </a-assets>
+            
+            <audio id="sfx-success" src="https://cdn.aframe.io/360-image-gallery-boilerplate/audio/click.ogg" crossorigin="anonymous"></audio>
+            <audio id="sfx-ko" src="https://media.istockphoto.com/id/1329035655/video/punch-boxing-face-hit-impact-02.mp4?s=mp4-640x640-is&k=20&c=64OQ_k3r1XJ6-yT9nK5qj1k5Q3v8W_G4u_X_X3k_Q=" crossorigin="anonymous"></audio>
+            </a-assets>
 
         <a-entity id="rig" position="0 0 2.5">
             <a-camera look-controls wasd-controls>
@@ -214,6 +217,9 @@
                 
                 <a-plane id="black-overlay" visible="false" position="0 0 -0.5" width="2" height="2" color="black" material="opacity: 0; transparent: true"></a-plane>
                 <a-text id="end-message" visible="false" position="0 0 -0.4" align="center" width="2" color="red" font="sourcecodepro"></a-text>
+                
+                <a-entity id="sound-success" sound="src: #sfx-success; poolSize: 5"></a-entity>
+                <a-entity id="sound-ko" sound="src: url(https://freesound.org/data/previews/163/163450_2393302-lq.mp3); poolSize: 5"></a-entity>
             </a-camera>
         </a-entity>
 
