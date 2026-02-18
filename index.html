@@ -1,11 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>VR Cyber Defense - Glass Edition</title>
+    <title>VR Cyber Defense - Ops Room Alive</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style> @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap'); </style>
 </head>
 <body>
+    <canvas id="matrix-canvas" width="512" height="256" style="display: none;"></canvas>
+    
+    <script>
+        // --- MATRIX CANVAS ANIMATION SCRIPT ---
+        (function(){
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            let w = canvas.width;
+            let h = canvas.height;
+            let cols = Math.floor(w / 20) + 1;
+            let ypos = Array(cols).fill(0);
+    
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, w, h);
+    
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'; // fade effect
+                ctx.fillRect(0, 0, w, h);
+                
+                ctx.fillStyle = '#0f0'; // Green text
+                ctx.font = '20px monospace';
+                
+                ypos.forEach((y, ind) => {
+                    // Generate random hex character
+                    const text = String.fromCharCode(Math.random() * 128);
+                    const x = ind * 20;
+                    ctx.fillText(text, x, y);
+                    
+                    // Reset condition or move down
+                    if (y > h && Math.random() > 0.975) ypos[ind] = 0;
+                    else ypos[ind] = y + 20;
+                });
+                requestAnimationFrame(drawMatrix);
+            }
+            drawMatrix();
+        })();
+    </script>
 
     <script>
         // --- GAME LOGIC (UNCHANGED) ---
@@ -75,25 +113,16 @@
                     return;
                 }
                 const data = gameData[idx];
-
-                // Update Panels
                 document.querySelector('#alert-title').setAttribute('value', data.alert);
-                
-                // Alert Light Logic
                 const roomLight = document.querySelector('#alert-light');
                 roomLight.setAttribute('intensity', '1.2');
                 roomLight.setAttribute('animation', 'property: intensity; from: 0.8; to: 1.5; dur: 800; dir: alternate; loop: true');
-                
                 document.querySelector('#log-display').setAttribute('value', data.logs);
-
-                // Update Buttons
                 const buttons = document.querySelectorAll('.cmd-btn');
                 const labels = document.querySelectorAll('.cmd-label');
-                
                 data.options.forEach((opt, i) => {
                     labels[i].setAttribute('value', `> ${opt.label}`);
                     buttons[i].setAttribute('data-correct', opt.correct);
-                    // Make buttons slightly transparent too
                     buttons[i].setAttribute('material', 'color: #333; opacity: 0.6; metalness: 0.8; roughness: 0.2'); 
                 });
             },
@@ -101,9 +130,7 @@
             verifyCommand: function(btnElement) {
                 const isCorrect = btnElement.getAttribute('data-correct') === 'true';
                 const output = document.querySelector('#terminal-output');
-
                 output.setAttribute('value', "EXECUTING...");
-
                 if (isCorrect) {
                     output.setAttribute('color', '#00ff00');
                     output.setAttribute('value', "ACCESS GRANTED. PATCHING...");
@@ -151,6 +178,8 @@
     <a-scene soc-manager background="color: #222" fog="type: exponential; color: #222; density: 0.01">
         
         <a-assets>
+            <img id="matrix-tex" src="#matrix-canvas">
+            
             <img id="concrete-tex" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/cubes.jpg">
             <a-mixin id="server-rack" geometry="primitive: box; height: 2.5; width: 0.8; depth: 0.8" 
                      material="color: #333; roughness: 0.5; metalness: 0.7"></a-mixin>
@@ -158,6 +187,9 @@
                      material="shader: flat; color: #00ff00"
                      animation="property: material.opacity; from: 1; to: 0; dur: 200; loop: true; dir: alternate"></a-mixin>
             <a-mixin id="glass-panel" material="opacity: 0.3; transparent: true; side: double; metalness: 0.9; roughness: 0.1"></a-mixin>
+
+            <a-mixin id="person-body" geometry="primitive: cylinder; height: 0.8; radius: 0.25" material="color: #222"></a-mixin>
+            <a-mixin id="person-head" geometry="primitive: sphere; radius: 0.18" material="color: #333"></a-mixin>
         </a-assets>
 
         <a-entity id="rig" position="0 0 0">
@@ -174,42 +206,57 @@
 
         <a-plane rotation="-90 0 0" width="15" height="15" src="#concrete-tex" repeat="4 4" metalness="0.1" roughness="0.8" color="#666"></a-plane>
         <a-plane rotation="90 0 0" position="0 3 0" width="15" height="15" color="#333"></a-plane>
-        <a-box position="0 1.5 -4" width="15" height="3" depth="0.1" src="#concrete-tex" repeat="3 1" color="#777"></a-box> 
-        <a-box position="-5 1.5 0" width="0.1" height="3" depth="15" src="#concrete-tex" repeat="3 1" color="#777"></a-box> 
+        <a-box position="0 1.5 -6" width="15" height="3" depth="0.1" src="#concrete-tex" repeat="3 1" color="#777"></a-box> <a-box position="-5 1.5 0" width="0.1" height="3" depth="15" src="#concrete-tex" repeat="3 1" color="#777"></a-box> 
         <a-box position="5 1.5 0" width="0.1" height="3" depth="15" src="#concrete-tex" repeat="3 1" color="#777"></a-box> 
 
         <a-box id="desk-surface" position="0 0.8 -1.2" width="2.8" height="0.1" depth="1.2" color="#444" metalness="0.5" roughness="0.3"></a-box>
-        
         <a-box position="0 1.2 -1.6" width="1.2" height="0.7" depth="0.05" color="#222"></a-box>
         <a-box position="-1.3 1.2 -1.4" rotation="0 25 0" width="0.8" height="0.6" depth="0.05" color="#222"></a-box>
         <a-box position="1.3 1.2 -1.4" rotation="0 -25 0" width="0.8" height="0.6" depth="0.05" color="#222"></a-box>
-
         <a-cylinder position="0.9 0.9 -1.0" radius="0.06" height="0.2" color="#ff9900" metalness="0.8"></a-cylinder>
 
         <a-entity mixin="server-rack" position="-3.5 1.25 -2.5"></a-entity>
         <a-entity mixin="blinking-light" position="-3.1 2 -2.5" rotation="0 90 0"></a-entity>
-        <a-entity mixin="server-rack" position="-3.5 1.25 -0.5"></a-entity>
-        <a-entity mixin="blinking-light" position="-3.1 1.5 -0.5" rotation="0 90 0" animation="dur: 100"></a-entity>
         <a-entity mixin="server-rack" position="3.5 1.25 -2.5"></a-entity>
         <a-entity mixin="blinking-light" position="3.1 1.8 -2.5" rotation="0 -90 0" color="red"></a-entity>
-        <a-entity mixin="server-rack" position="3.5 1.25 -0.5"></a-entity>
-        
+
+        <a-entity position="-4 0 -5" rotation="0 30 0">
+            <a-box width="2" height="0.8" depth="1" color="#333" position="0 0.4 0"></a-box>
+            <a-plane width="1.8" height="1" position="0 1.4 -0.4" rotation="-10 0 0" material="src: #matrix-tex; flatShading: true"></a-plane>
+            <a-light type="point" color="#0f0" intensity="0.5" distance="3" position="0 1.5 -0.5"></a-light>
+            <a-entity position="0 0.9 0.5">
+                <a-entity mixin="person-body"></a-entity>
+                <a-entity mixin="person-head" position="0 0.6 0"></a-entity>
+                <a-box color="#222" width="0.15" height="0.1" depth="0.5" position="-0.3 0.2 -0.3" rotation="15 0 0"></a-box>
+                <a-box color="#222" width="0.15" height="0.1" depth="0.5" position="0.3 0.2 -0.3" rotation="15 0 0"></a-box>
+            </a-entity>
+        </a-entity>
+
+        <a-entity position="4 0 -5" rotation="0 -30 0">
+             <a-box width="2" height="0.8" depth="1" color="#333" position="0 0.4 0"></a-box>
+            <a-plane width="1.8" height="1" position="0 1.4 -0.4" rotation="-10 0 0" material="src: #matrix-tex; flatShading: true"></a-plane>
+             <a-light type="point" color="#0f0" intensity="0.5" distance="3" position="0 1.5 -0.5"></a-light>
+            <a-entity position="0 0.9 0.5">
+                <a-entity mixin="person-body"></a-entity>
+                <a-entity mixin="person-head" position="0 0.6 0"></a-entity>
+                 <a-box color="#222" width="0.15" height="0.1" depth="0.5" position="-0.3 0.2 -0.3" rotation="15 0 0"></a-box>
+                 <a-box color="#222" width="0.15" height="0.1" depth="0.5" position="0.3 0.2 -0.3" rotation="15 0 0"></a-box>
+            </a-entity>
+        </a-entity>
+
+
         <a-entity position="0 1.6 -1.3">
-            
             <a-entity position="-1.8 0 0.5" rotation="0 25 0">
                 <a-plane id="alert-panel" width="1.4" height="1" mixin="glass-panel" color="#440000">
                      <a-text value="THREAT INTELLIGENCE" position="0 0.4 0.01" align="center" color="#ff8888" width="3"></a-text>
                      <a-text id="alert-title" value="SCANNING..." position="0 0 0.01" align="center" width="2.5" color="red" font="sourcecodepro"></a-text>
                 </a-plane>
             </a-entity>
-
             <a-entity position="0 -0.2 0">
                 <a-text id="timer-display" value="00:00" position="0 0.6 0.01" align="center" color="yellow" width="4"></a-text>
-                
                 <a-plane mixin="glass-panel" color="#001133" height="0.3" width="1.6" position="0 0.25 0">
                     <a-text id="terminal-output" value="root@darkweb:~#" color="#00ff00" align="left" position="-0.75 0 0.01" width="2"></a-text>
                 </a-plane>
-
                 <a-entity position="0 -0.1 0.05">
                     <a-box class="cmd-btn" position="0 0.2 0" depth="0.02" height="0.12" width="1.4" 
                            material="color: #444; opacity: 0.6; transparent: true" onclick="clickBtn(0)">
@@ -225,14 +272,12 @@
                     </a-box>
                 </a-entity>
             </a-entity>
-
             <a-entity position="1.8 0 0.5" rotation="0 -25 0">
                 <a-plane width="1.4" height="1" mixin="glass-panel" color="#000044">
                     <a-text value="PACKET SNIFFER" position="0 0.4 0.01" align="center" color="#8888ff" width="3"></a-text>
                     <a-text id="log-display" value="..." position="-0.65 0.1 0.01" align="left" width="1.3" color="#aaaaff" font="sourcecodepro"></a-text>
                 </a-plane>
             </a-entity>
-
         </a-entity>
 
     </a-scene>
