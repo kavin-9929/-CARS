@@ -1,1 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VR Cyber Defense Protocol</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-environment-component@1.3.3/dist/aframe-environment-component.min.js"></script>
+    <script src="https://unpkg.com/aframe-animation-component@5.1.2/dist/aframe-animation-component.min.js"></script>
+    
+    <style>
+        /* Retro Terminal Font */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+    </style>
+</head>
+<body>
 
+    <script>
+        // --- DATA & CONFIG ---
+        const gameData = [
+            {
+                level: 1,
+                name: "MITM ATTACK",
+                alert: "WARNING: ARP POISONING",
+                logs: "[SYSTEM]: Monitoring Traffic...\n[ALERT]: Duplicate MAC address found on gateway.\n[NET]: 192.168.1.105 is redirecting packets.\n[SEC]: SSL Certificate mismatch detected.",
+                options: [
+                    { cmd: "sudo flush_dns", label: "Flush DNS Cache", correct: false },
+                    { cmd: "arp -s 192.168.1.1 static", label: "Set Static ARP Entry", correct: true }, 
+                    { cmd: "ping google.com", label: "Ping Test", correct: false }
+                ]
+            },
+            {
+                level: 2,
+                name: "DDOS FLOOD",
+                alert: "CRITICAL: TRAFFIC OVERLOAD",
+                logs: "[WARN]: CPU Usage at 99%.\n[NET]: Inbound UDP packet rate > 50,000/sec.\n[FIREWALL]: Connection table full.\n[SRC]: Multiple IPs (Botnet Signature).",
+                options: [
+                    { cmd: "iptables -A INPUT -p udp -j DROP", label: "Drop UDP Traffic", correct: true },
+                    { cmd: "service apache2 restart", label: "Restart Web Server", correct: false },
+                    { cmd: "shutdown -h now", label: "Emergency Shutdown", correct: false }
+                ]
+            },
+            {
+                level: 3,
+                name: "RANSOMWARE",
+                alert: "SECURITY BREACH: ENCRYPTION",
+                logs: "[KERNEL]: Unauthorized write access to /dev/sda1.\n[PROC]: 'wannacry.exe' spawned by PID 404.\n[DATA]: User files are being encrypted.\n[NET]: C2 Server connection established.",
+                options: [
+                    { cmd: "kill -9 404", label: "Kill Process 404", correct: true },
+                    { cmd: "cp -r /data /backup", label: "Attempt Backup", correct: false },
+                    { cmd: "chmod 777 /root", label: "Grant Permissions", correct: false }
+                ]
+            }
+        ];
+
+        let currentLevel = 0;
+        let timeLeft = 240; // 4 mins
+        let timerRunning = false;
+        
+        // --- SOUNDS (Data URIs for portability) ---
+        const sfxClick = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU..."); // Placeholder (browsers block auto-audio, usually needs interaction)
+        // Note: For real production, use actual .mp3 files in an assets folder.
+
+        AFRAME.registerComponent('cyber-deck', {
+            init: function () {
+                this.startSequence();
+            },
+
+            startSequence: function() {
+                // Intro Animation
+                setTimeout(() => {
+                    this.loadLevel(0);
+                    this.startTimer();
+                }, 1000);
+            },
+
+            startTimer: function() {
+                if(timerRunning) return;
+                timerRunning = true;
+                const timerEl = document.querySelector('#timer-display');
+                
+                setInterval(() => {
+                    if(timeLeft > 0) {
+                        timeLeft--;
+                        let m = Math.floor(timeLeft / 60);
+                        let s = timeLeft % 60;
+                        timerEl.setAttribute('value', `T-MINUS: 0${m}:${s < 10 ? '0'+s : s}`);
+                        
+                        // Stress mechanic: Turn timer red if under 1 min
+                        if(timeLeft < 60) timerEl.setAttribute('color', 'red');
+                    } else {
+                        this.triggerGlitch("TIME EXPIRED");
+                    }
+                }, 1000);
+            },
+
+            typeWriterLog: function(text) {
+                const logEl = document.querySelector('#log-display');
+                let i = 0;
+                logEl.setAttribute('value', ''); // Clear
+                
+                // Speed of typing
+                let interval = setInterval(() => {
+                    logEl.setAttribute('value', logEl.getAttribute('value') + text.charAt(i));
+                    i++;
+                    if (i > text.length - 1) clearInterval(interval);
+                }, 20); 
+            },
+
+            loadLevel: function(idx) {
+                if (idx >= gameData.length) {
+                    this.missionSuccess();
+                    return;
+                }
+                const data = gameData[idx];
+
+                // 1. Update Alert Panel (Left)
+                const alertTitle = document.querySelector('#alert-title');
+                alertTitle.setAttribute('value', data.alert);
+                // Pulse the light red
+                document.querySelector('#ambient-light').setAttribute('animation', 'property: color; to: #ff0000; dur: 500; loop: true; dir: alternate');
+
+                // 2. Update Logs (Right) - Use Typewriter effect
+                this.typeWriterLog(data.logs);
+
+                // 3. Update Terminal Buttons (Center)
+                const buttons = document.querySelectorAll('.cmd-btn');
+                const labels = document.querySelectorAll('.cmd-label');
+                
+                data.options.forEach((opt, i) => {
+                    labels[i].setAttribute('value', `> ${opt.label}`);
+                    // Store correctness in the button entity
+                    buttons[i].setAttribute('data-correct', opt.correct);
+                    buttons[i].setAttribute('data-cmd', opt.cmd);
+                    // Reset colors
+                    buttons[i].setAttribute('material', 'color: #003300; opacity: 0.5');
+                });
+            },
+
+            verifyCommand: function(btnElement) {
+                const isCorrect = btnElement.getAttribute('data-correct') === 'true';
+                const cmdText = btnElement.getAttribute('data-cmd');
+                const terminalOut = document.querySelector('#terminal-output');
+
+                // Show command running
+                terminalOut.setAttribute('value', `root@sys:~# ${cmdText}...`);
+
+                if (isCorrect) {
+                    terminalOut.setAttribute('color', '#00ff00');
+                    setTimeout(() => {
+                        terminalOut.setAttribute('value', `SUCCESS. PATCH APPLIED.`);
+                        currentLevel++;
+                        setTimeout(() => this.loadLevel(currentLevel), 1500);
+                    }, 1000);
+                } else {
+                    this.triggerGlitch();
+                }
+            },
+
+            triggerGlitch: function() {
+                // 1. Visual Chaos
+                const scene = document.querySelector('#main-cam');
+                const terminal = document.querySelector('#terminal-output');
+                
+                terminal.setAttribute('value', "CRITICAL ERROR: SEGMENTATION FAULT");
+                terminal.setAttribute('color', 'red');
+
+                // Camera Shake Animation
+                scene.setAttribute('animation', 'property: position; from: 0 1.6 0; to: 0.1 1.7 0.1; dur: 50; loop: 6; dir: alternate');
+                
+                // Red Flash
+                const bg = document.querySelector('a-sky');
+                bg.setAttribute('color', 'red');
+
+                // Lockout for 3 seconds
+                setTimeout(() => {
+                    scene.removeAttribute('animation');
+                    scene.setAttribute('position', '0 1.6 0'); // Reset pos
+                    bg.setAttribute('color', '#000');
+                    terminal.setAttribute('value', "Rebooting subsystem...");
+                    terminal.setAttribute('color', 'yellow');
+                }, 3000);
+            },
+
+            missionSuccess: function() {
+                document.querySelector('#alert-title').setAttribute('value', "SYSTEM SECURE");
+                document.querySelector('#alert-panel').setAttribute('material', 'color: green');
+                document.querySelector('#log-display').setAttribute('value', "All threats neutralized.\nSystem Integrity: 100%");
+                document.querySelector('#terminal-output').setAttribute('value', "MISSION ACCOMPLISHED");
+                document.querySelector('#ambient-light').setAttribute('color', '#00ff00');
+                document.querySelector('#ambient-light').removeAttribute('animation');
+            }
+        });
+
+        // Global click handler helper
+        function clickBtn(index) {
+            const btns = document.querySelectorAll('.cmd-btn');
+            document.querySelector('a-scene').components['cyber-deck'].verifyCommand(btns[index]);
+        }
+    </script>
+
+    <a-scene cyber-deck>
+        
+        <a-assets>
+            <a-mixin id="holo-panel" geometry="primitive: plane; height: 1.5; width: 2" 
+                     material="color: #0a0a0a; transparent: true; opacity: 0.8; side: double; shader: flat"
+                     text="font: https://cdn.aframe.io/fonts/SourceCodePro.fnt"></a-mixin>
+            <a-mixin id="button-style" geometry="primitive: box; height: 0.2; width: 1.8; depth: 0.05"
+                     material="color: #003300; opacity: 0.8; transparent: true"
+                     animation__hover="property: scale; to: 1.05 1.05 1.05; startEvents: mouseenter; dur: 200"
+                     animation__leave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200"></a-mixin>
+        </a-assets>
+
+        <a-entity environment="preset: tron; grid: 1x1; playArea: 1.2; skyType: atmosphere; lighting: none"></a-entity>
+        <a-light id="ambient-light" type="point" position="0 2 0" intensity="0.8" color="#00ff00" distance="10"></a-light>
+        <a-light type="ambient" intensity="0.2"></a-light>
+
+        <a-entity>
+            <a-box color="green" depth="0.1" height="0.1" width="0.1" position="-2 2 -3" animation="property: position; to: -2 4 -3; loop: true; dur: 2000"></a-box>
+            <a-box color="green" depth="0.1" height="0.1" width="0.1" position="2 1 -3" animation="property: position; to: 2 5 -3; loop: true; dur: 3000"></a-box>
+        </a-entity>
+
+        <a-entity id="main-cam" position="0 1.6 0">
+            <a-camera look-controls wasd-controls>
+                <a-cursor color="#00ff00" fuse="true" fuse-timeout="1500"
+                          animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150">
+                </a-cursor>
+            </a-camera>
+        </a-entity>
+
+        <a-entity position="0 1.2 -1.5" rotation="-10 0 0">
+            
+            <a-entity position="-2.2 0 0.5" rotation="0 25 0">
+                <a-entity mixin="holo-panel" material="color: #330000; opacity: 0.6">
+                     <a-text value="THREAT DETECTION" position="0 0.6 0.01" align="center" color="#ff5555" width="4"></a-text>
+                     <a-text id="alert-title" value="LOADING..." position="0 0 0.01" align="center" width="3.5" color="red"></a-text>
+                </a-entity>
+                <a-box position="-1 0 0" height="1.5" width="0.05" depth="0.05" color="red"></a-box>
+            </a-entity>
+
+            <a-entity position="0 0 0" rotation="0 0 0">
+                <a-entity mixin="holo-panel" material="color: #001100">
+                    <a-text id="timer-display" value="00:00" position="0 0.65 0.01" align="center" color="#00ff00" width="5"></a-text>
+                    
+                    <a-plane color="black" height="0.3" width="1.8" position="0 0.3 0.02">
+                        <a-text id="terminal-output" value="root@sys:~# awaiting_input..." color="#00ff00" align="left" position="-0.85 0 0" width="3" font="sourcecodepro"></a-text>
+                    </a-plane>
+
+                    <a-entity position="0 -0.2 0.05">
+                        <a-entity class="cmd-btn" mixin="button-style" position="0 0.3 0" onclick="clickBtn(0)">
+                            <a-text class="cmd-label" value="Option 1" align="center" z-offset="0.06"></a-text>
+                        </a-entity>
+                        <a-entity class="cmd-btn" mixin="button-style" position="0 0 0" onclick="clickBtn(1)">
+                            <a-text class="cmd-label" value="Option 2" align="center" z-offset="0.06"></a-text>
+                        </a-entity>
+                        <a-entity class="cmd-btn" mixin="button-style" position="0 -0.3 0" onclick="clickBtn(2)">
+                            <a-text class="cmd-label" value="Option 3" align="center" z-offset="0.06"></a-text>
+                        </a-entity>
+                    </a-entity>
+                </a-entity>
+            </a-entity>
+
+            <a-entity position="2.2 0 0.5" rotation="0 -25 0">
+                <a-entity mixin="holo-panel" material="color: #000033">
+                    <a-text value="LIVE PACKET CAPTURE" position="0 0.6 0.01" align="center" color="#5555ff" width="3"></a-text>
+                    <a-text id="log-display" value="..." position="-0.9 0.2 0.01" align="left" width="1.8" height="1" baseline="top" font="sourcecodepro" color="#aaaaFF"></a-text>
+                </a-entity>
+                <a-box position="1 0 0" height="1.5" width="0.05" depth="0.05" color="blue"></a-box>
+            </a-entity>
+
+        </a-entity>
+
+    </a-scene>
+</body>
+</html>
