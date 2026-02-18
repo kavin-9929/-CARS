@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>VR Cyber Command - Fixed & Polished</title>
+    <title>VR Cyber Command - Final Auto-Shutdown</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style> @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap'); </style>
 </head>
@@ -67,7 +67,7 @@
         ];
         
         let currentLevel = 0; 
-        let timeLeft = 240; 
+        let timeLeft = 240; // 4 minutes
         let timerInterval;
         
         AFRAME.registerComponent('soc-manager', {
@@ -86,7 +86,9 @@
                         timerEl.setAttribute('value', `TIME REMAINING: 0${m}:${s < 10 ? '0'+s : s}`); 
                         if(timeLeft < 60) timerEl.setAttribute('color', 'red'); 
                     } else { 
-                        this.triggerGlitch("TIMEOUT"); 
+                        // TIME IS UP - TRIGGER SHUTDOWN
+                        clearInterval(timerInterval);
+                        this.shutdownSequence();
                     } 
                 }, 1000); 
             },
@@ -96,41 +98,27 @@
                     this.missionSuccess(); 
                     return; 
                 } 
-                
                 const data = gameData[idx]; 
-                
-                // Update Panels
                 document.querySelector('#alert-title').setAttribute('value', data.alert); 
                 document.querySelector('#log-display').setAttribute('value', data.logs); 
-                
-                // Alert Light Animation
                 const roomLight = document.querySelector('#alert-light'); 
                 roomLight.setAttribute('intensity', '1.2'); 
                 roomLight.setAttribute('animation', 'property: intensity; from: 0.8; to: 1.5; dur: 800; dir: alternate; loop: true'); 
-
-                // Update Buttons
                 const labels = document.querySelectorAll('.cmd-label'); 
                 data.options.forEach((opt, i) => { 
                     labels[i].setAttribute('value', `> ${opt.label}`); 
                 }); 
             },
             
-            // --- FIXED VERIFICATION LOGIC ---
-            // Now accepts the INDEX of the button clicked, instead of reading HTML attributes
             verifyCommand: function(btnIndex) { 
-                if (currentLevel >= gameData.length) return; // Prevent errors if game is won
-
-                // Direct Data Check (Bulletproof)
+                if (currentLevel >= gameData.length) return; 
                 const isCorrect = gameData[currentLevel].options[btnIndex].correct; 
                 const output = document.querySelector('#terminal-output'); 
-                
                 output.setAttribute('value', "EXECUTING COMMAND..."); 
                 
                 if (isCorrect) { 
                     output.setAttribute('color', '#00ff00'); 
                     output.setAttribute('value', "ACCESS GRANTED. PATCHING..."); 
-                    
-                    // Delay to show success message before next level
                     setTimeout(() => { 
                         currentLevel++; 
                         this.loadLevel(currentLevel); 
@@ -146,55 +134,170 @@
             triggerGlitch: function() { 
                 const cam = document.querySelector('#rig'); 
                 const terminal = document.querySelector('#terminal-output'); 
-                
-                // 1. Camera Shake
                 cam.setAttribute('animation', 'property: position; from: 0 0 2.5; to: 0.1 0.1 2.5; dur: 50; loop: 10; dir: alternate'); 
-                
-                // 2. Big Red Error Message
                 terminal.setAttribute('value', "CRITICAL ERROR: FILES CORRUPTED"); 
                 terminal.setAttribute('color', 'red'); 
-                
-                // 3. Lockout for 3 seconds
                 setTimeout(() => { 
                     cam.removeAttribute('animation'); 
                     cam.setAttribute('position', '0 0 2.5'); 
                     terminal.setAttribute('value', "SYSTEM REBOOTING..."); 
-                    
                     setTimeout(() => {
                         terminal.setAttribute('value', "AWAITING INPUT...");
                         terminal.setAttribute('color', '#00ff00');
                     }, 1500);
                 }, 3000); 
             },
+
+            // --- AUTO CLOSE SEQUENCE ---
+            shutdownSequence: function() {
+                // 1. Play shutdown sound (if you add audio later)
+                // 2. Fade everything to black
+                const blackOverlay = document.querySelector('#black-overlay');
+                blackOverlay.setAttribute('visible', 'true');
+                blackOverlay.setAttribute('animation', 'property: material.opacity; from: 0; to: 1; dur: 2000');
+                
+                // 3. Show "Connection Lost" Message
+                setTimeout(() => {
+                    const endMsg = document.querySelector('#end-message');
+                    endMsg.setAttribute('visible', 'true');
+                    endMsg.setAttribute('value', "CONNECTION TERMINATED\n\nSESSION TIMED OUT");
+                }, 2000);
+
+                // 4. Try to close window (Note: Browsers may block this)
+                setTimeout(() => {
+                    window.close(); // Attempt to close tab
+                    // Fallback if browser blocks close:
+                    document.querySelector('#end-message').setAttribute('value', "SIMULATION ENDED.\nPLEASE REMOVE HEADSET.");
+                }, 5000);
+            },
             
             missionSuccess: function() { 
-                clearInterval(timerInterval); // Stop timer
-                
-                // Update UI to Green
+                clearInterval(timerInterval); 
                 document.querySelector('#alert-title').setAttribute('value', "SYSTEM SECURE"); 
                 document.querySelector('#alert-panel').setAttribute('material', 'color: #004400; opacity: 0.4'); 
                 document.querySelector('#timer-display').setAttribute('value', "00:00");
                 document.querySelector('#timer-display').setAttribute('color', '#00ff00');
-
-                // Room Light turns to Victory Blue
                 const roomLight = document.querySelector('#alert-light'); 
                 roomLight.setAttribute('color', '#00aaff'); 
                 roomLight.removeAttribute('animation'); 
                 roomLight.setAttribute('intensity', '0.6'); 
-                
                 document.querySelector('#log-display').setAttribute('value', "ALL THREATS NEUTRALIZED.\nREPORT GENERATED."); 
-                
-                // Final Success Message
                 const term = document.querySelector('#terminal-output');
                 term.setAttribute('value', "MISSION SUCCESSFUL"); 
                 term.setAttribute('color', '#00ff00');
             }
         });
         
-        // Helper function that passes the index directly
         function clickBtn(index) { 
             document.querySelector('a-scene').components['soc-manager'].verifyCommand(index); 
         }
     </script>
 
-    <a-scene soc-manager background="color:
+    <a-scene soc-manager background="color: #222" fog="type: exponential; color: #111; density: 0.02">
+        <a-assets>
+            <img id="matrix-tex" src="#matrix-canvas">
+            <img id="concrete-tex" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/cubes.jpg">
+            <a-mixin id="server-rack" geometry="primitive: box; height: 2.5; width: 0.8; depth: 0.8" material="color: #333; roughness: 0.5; metalness: 0.7"></a-mixin>
+            <a-mixin id="blinking-light" geometry="primitive: plane; height: 0.02; width: 0.02" material="shader: flat; color: #00ff00" animation="property: material.opacity; from: 1; to: 0; dur: 200; loop: true; dir: alternate"></a-mixin>
+            <a-mixin id="glass-panel" material="opacity: 0.3; transparent: true; side: double; metalness: 0.9; roughness: 0.1"></a-mixin>
+            
+            <a-mixin id="chair-base" geometry="primitive: box; width: 0.6; height: 0.1; depth: 0.6" material="color: #111"></a-mixin>
+            <a-mixin id="chair-back" geometry="primitive: box; width: 0.6; height: 0.8; depth: 0.1" material="color: #111"></a-mixin>
+            <a-mixin id="op-torso" geometry="primitive: cylinder; height: 0.7; radius: 0.25" material="color: #0a0a0a; roughness: 1"></a-mixin>
+            <a-mixin id="op-head" geometry="primitive: sphere; radius: 0.18" material="color: #0a0a0a"></a-mixin>
+            <a-mixin id="white-mask" geometry="primitive: sphere; radius: 0.17" scale="1 1.1 0.3" material="color: #eeeeee; roughness: 0.5; metalness: 0.1"></a-mixin>
+        </a-assets>
+
+        <a-entity id="rig" position="0 0 2.5">
+            <a-camera look-controls wasd-controls>
+                <a-cursor color="cyan" fuse="true" fuse-timeout="1000" animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"></a-cursor>
+                
+                <a-plane id="black-overlay" visible="false" position="0 0 -0.5" width="2" height="2" color="black" material="opacity: 0; transparent: true"></a-plane>
+                <a-text id="end-message" visible="false" position="0 0 -0.4" align="center" width="2" color="red" font="sourcecodepro"></a-text>
+            </a-camera>
+        </a-entity>
+
+        <a-light type="ambient" intensity="0.4" color="#ffffff"></a-light>
+        <a-light id="alert-light" type="point" position="0 2.5 0" intensity="0.8" color="#ff0000" distance="20"></a-light>
+        <a-light type="spot" position="0 2 3" target="#desk-surface" penumbra="0.5" angle="40" intensity="1.5" color="#ffffff"></a-light>
+        <a-light type="point" position="0 1.5 -1" intensity="0.5" color="#00aaff" distance="4"></a-light>
+
+        <a-plane rotation="-90 0 0" width="15" height="15" src="#concrete-tex" repeat="4 4" metalness="0.1" roughness="0.8" color="#444"></a-plane>
+        <a-plane rotation="90 0 0" position="0 3 0" width="15" height="15" color="#111"></a-plane>
+        <a-box position="0 1.5 -6" width="15" height="3" depth="0.1" src="#concrete-tex" repeat="3 1" color="#555"></a-box> 
+        <a-box position="-5 1.5 0" width="0.1" height="3" depth="15" src="#concrete-tex" repeat="3 1" color="#555"></a-box> 
+        <a-box position="5 1.5 0" width="0.1" height="3" depth="15" src="#concrete-tex" repeat="3 1" color="#555"></a-box> 
+
+        <a-box id="desk-surface" position="0 0.8 -1.2" width="3.5" height="0.1" depth="1.2" color="#333" metalness="0.6" roughness="0.4"></a-box>
+        <a-cylinder position="0 0.9 -1.0" radius="0.06" height="0.2" color="#ff9900" metalness="0.8"></a-cylinder>
+
+        <a-entity position="-0.8 0 0.4" rotation="0 10 0">
+            <a-entity mixin="chair-base" position="0 0.4 0"></a-entity>
+            <a-entity mixin="chair-back" position="0 0.8 0.25"></a-entity>
+            <a-entity mixin="op-torso" position="0 0.85 -0.1"></a-entity>
+            <a-entity position="0 1.35 -0.1">
+                <a-entity mixin="op-head"></a-entity>
+                <a-entity mixin="white-mask" position="0 0 -0.12"></a-entity>
+            </a-entity>
+            <a-box color="#0a0a0a" width="0.1" height="0.1" depth="0.6" position="-0.25 0.85 -0.5" rotation="-15 0 0"></a-box>
+            <a-box color="#0a0a0a" width="0.1" height="0.1" depth="0.6" position="0.25 0.85 -0.5" rotation="-15 0 0"></a-box>
+        </a-entity>
+
+        <a-entity position="0.8 0 0.4" rotation="0 -10 0">
+             <a-entity mixin="chair-base" position="0 0.4 0"></a-entity>
+             <a-entity mixin="chair-back" position="0 0.8 0.25"></a-entity>
+             <a-entity mixin="op-torso" position="0 0.85 -0.1"></a-entity>
+             <a-entity position="0 1.35 -0.1">
+                 <a-entity mixin="op-head"></a-entity>
+                 <a-entity mixin="white-mask" position="0 0 -0.12"></a-entity>
+             </a-entity>
+            <a-box color="#0a0a0a" width="0.1" height="0.1" depth="0.6" position="-0.25 0.85 -0.5" rotation="-15 0 0"></a-box>
+            <a-box color="#0a0a0a" width="0.1" height="0.1" depth="0.6" position="0.25 0.85 -0.5" rotation="-15 0 0"></a-box>
+        </a-entity>
+
+        <a-entity mixin="server-rack" position="-3.5 1.25 -2.5"></a-entity>
+        <a-entity mixin="blinking-light" position="-3.1 2 -2.5" rotation="0 90 0"></a-entity>
+        <a-entity mixin="server-rack" position="3.5 1.25 -2.5"></a-entity>
+        <a-entity mixin="blinking-light" position="3.1 1.8 -2.5" rotation="0 -90 0" color="red"></a-entity>
+        
+        <a-entity position="-4 0 -4" rotation="0 45 0">
+            <a-plane width="1.5" height="0.8" position="0 1.4 0" material="src: #matrix-tex; flatShading: true"></a-plane>
+        </a-entity>
+        <a-entity position="4 0 -4" rotation="0 -45 0">
+            <a-plane width="1.5" height="0.8" position="0 1.4 0" material="src: #matrix-tex; flatShading: true"></a-plane>
+        </a-entity>
+
+        <a-entity position="0 1.6 -1.3">
+            <a-entity position="-1.8 0 0.5" rotation="0 25 0">
+                <a-plane id="alert-panel" width="1.4" height="1" mixin="glass-panel" color="#440000">
+                     <a-text value="THREAT INTELLIGENCE" position="0 0.4 0.01" align="center" color="#ff8888" width="3"></a-text>
+                     <a-text id="alert-title" value="SCANNING..." position="0 0 0.01" align="center" width="2.5" color="red" font="sourcecodepro"></a-text>
+                </a-plane>
+            </a-entity>
+            <a-entity position="0 -0.2 0">
+                <a-text id="timer-display" value="00:00" position="0 0.6 0.01" align="center" color="yellow" width="4"></a-text>
+                <a-plane mixin="glass-panel" color="#001133" height="0.3" width="1.6" position="0 0.25 0">
+                    <a-text id="terminal-output" value="root@darkweb:~#" color="#00ff00" align="left" position="-0.75 0 0.01" width="2"></a-text>
+                </a-plane>
+                <a-entity position="0 -0.1 0.05">
+                    <a-box class="cmd-btn" position="0 0.2 0" depth="0.02" height="0.12" width="1.4" material="color: #444; opacity: 0.6; transparent: true" onclick="clickBtn(0)">
+                        <a-text class="cmd-label" value="Option A" align="center" z-offset="0.03" color="white"></a-text>
+                    </a-box>
+                    <a-box class="cmd-btn" position="0 0 0" depth="0.02" height="0.12" width="1.4" material="color: #444; opacity: 0.6; transparent: true" onclick="clickBtn(1)">
+                        <a-text class="cmd-label" value="Option B" align="center" z-offset="0.03" color="white"></a-text>
+                    </a-box>
+                    <a-box class="cmd-btn" position="0 -0.2 0" depth="0.02" height="0.12" width="1.4" material="color: #444; opacity: 0.6; transparent: true" onclick="clickBtn(2)">
+                        <a-text class="cmd-label" value="Option C" align="center" z-offset="0.03" color="white"></a-text>
+                    </a-box>
+                </a-entity>
+            </a-entity>
+            <a-entity position="1.8 0 0.5" rotation="0 -25 0">
+                <a-plane width="1.4" height="1" mixin="glass-panel" color="#000044">
+                    <a-text value="PACKET SNIFFER" position="0 0.4 0.01" align="center" color="#8888ff" width="3"></a-text>
+                    <a-text id="log-display" value="..." position="-0.65 0.1 0.01" align="left" width="1.3" color="#aaaaff" font="sourcecodepro"></a-text>
+                </a-plane>
+            </a-entity>
+        </a-entity>
+    </a-scene>
+</body>
+</html>
